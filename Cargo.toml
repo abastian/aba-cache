@@ -1,0 +1,7 @@
+[package]
+name = "aba-cache"
+version = "0.1.0-SNAPSHOT"
+authors = ["Arief Bastian HB <ariefbastian@gmail.com>"]
+edition = "2018"
+
+[dependencies]
