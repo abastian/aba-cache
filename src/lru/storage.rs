@@ -2,13 +2,6 @@ use std::mem;
 
 const NULL_SIGIL: usize = !0;
 
-#[derive(Debug, PartialEq)]
-pub enum Error {
-    EmptyStorage,
-    InvalidIndex,
-    KeyNotExist,
-}
-
 pub(super) struct Storage<K, V> {
     entries: Vec<Entry<K, V>>,
 
@@ -71,9 +64,9 @@ impl<K, V> Storage<K, V> {
             let id = self.tail;
             let tail = if self.head == id {
                 // single content, already on top
-                self.entries.get_mut(id).unwrap()
+                &mut self.entries[id]
             } else {
-                self.move_to_top(self.tail).unwrap()
+                unsafe { self.move_to_top(self.tail) }
             };
             let old_key = mem::replace(&mut tail.key, key);
             let old_data = mem::replace(&mut tail.data, data);
@@ -81,32 +74,25 @@ impl<K, V> Storage<K, V> {
         }
     }
 
-    pub(super) fn update(&mut self, index: usize, data: V) -> Result<V, Error> {
+    pub(super) fn update(&mut self, index: usize, data: V) -> V {
         let tail = if self.head == index {
             // single content, already on top
             self.entries.get_mut(index).unwrap()
         } else {
-            self.move_to_top(index)?
+            unsafe { self.move_to_top(index) }
         };
-        let old_data = mem::replace(&mut tail.data, data);
-        Ok(old_data)
+        mem::replace(&mut tail.data, data)
     }
 
-    pub(super) fn get(&mut self, index: usize) -> Result<&V, Error> {
-        let valid_limit = self.entries.len();
-        if index < valid_limit {
-            // valid range for index
-            if self.head == NULL_SIGIL {
-                // empty list
-                Err(Error::EmptyStorage)
-            } else if index == self.head {
-                Ok(&self.entries.get(index).unwrap().data)
-            } else {
-                let res = self.move_to_top(index)?;
-                Ok(&res.data)
-            }
+    pub(super) fn get(&mut self, index: usize) -> Option<&V> {
+        // valid range for index
+        if self.head == NULL_SIGIL {
+            // empty list
+            None
+        } else if index == self.head {
+            self.entries.get(index).map(|entry| &entry.data)
         } else {
-            Err(Error::InvalidIndex)
+            Some(&unsafe { self.move_to_top(index) }.data)
         }
     }
 
@@ -114,45 +100,37 @@ impl<K, V> Storage<K, V> {
         self.cap
     }
 
-    fn move_to_top(&mut self, index: usize) -> Result<&mut Entry<K, V>, Error> {
-        let valid_limit = self.entries.len();
-        if self.head >= valid_limit {
-            unreachable!();
-        }
-
+    /// Move entry at index to head position
+    ///
+    /// # Safety
+    ///
+    /// It is undefined behaviour to call this function when any pointer
+    /// is out of bound.
+    unsafe fn move_to_top(&mut self, index: usize) -> &mut Entry<K, V> {
         // need to access elements inside as mutable,
         // on normal condition, rust can't borrow multiple mutable elements
         // on one container at one time
-        let result = unsafe {
-            let target = &mut *(self.entries.get_unchecked_mut(index) as *mut Entry<K, V>);
-            if target.next >= valid_limit && target.next != NULL_SIGIL {
-                return Err(Error::InvalidIndex);
-            }
-            if target.prev >= valid_limit {
-                return Err(Error::InvalidIndex);
-            }
-            let next = if target.next != NULL_SIGIL {
-                Some(&mut *(self.entries.get_unchecked_mut(target.next) as *mut Entry<K, V>))
-            } else {
-                None
-            };
-            let prev = &mut *(self.entries.get_unchecked_mut(target.prev) as *mut Entry<K, V>);
-            let head = &mut *(self.entries.get_unchecked_mut(self.head) as *mut Entry<K, V>);
-
-            if let Some(next) = next {
-                next.prev = target.prev;
-            } else {
-                // target is the tail, need to move tail to prev
-                self.tail = target.prev;
-            }
-            prev.next = target.next;
-            target.next = self.head;
-            target.prev = NULL_SIGIL;
-            head.prev = index;
-            self.head = index;
-            target
+        let target = &mut *(self.entries.get_unchecked_mut(index) as *mut Entry<K, V>);
+        let next = if target.next != NULL_SIGIL {
+            Some(&mut *(self.entries.get_unchecked_mut(target.next) as *mut Entry<K, V>))
+        } else {
+            None
         };
-        Ok(result)
+        let prev = &mut *(self.entries.get_unchecked_mut(target.prev) as *mut Entry<K, V>);
+        let head = &mut *(self.entries.get_unchecked_mut(self.head) as *mut Entry<K, V>);
+
+        if let Some(next) = next {
+            next.prev = target.prev;
+        } else {
+            // target is the tail, need to move tail to prev
+            self.tail = target.prev;
+        }
+        prev.next = target.next;
+        target.next = self.head;
+        target.prev = NULL_SIGIL;
+        head.prev = index;
+        self.head = index;
+        target
     }
 
     #[cfg(test)]

@@ -11,7 +11,7 @@ fn test_get_on_empty_cache() {
     let mut cache = Cache::<(), usize>::new(1);
 
     assert!(cache.is_empty());
-    assert_eq!(cache.get(&()).err(), Some(Error::EmptyStorage));
+    assert_eq!(cache.get(&()), None);
 }
 
 #[test]
@@ -20,7 +20,7 @@ fn test_get_uncached_key() {
 
     cache.put(1, 1);
 
-    assert_eq!(cache.get(&2).err(), Some(Error::KeyNotExist));
+    assert_eq!(cache.get(&2), None);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
         item.id() == 0 && item.prev() == !0 && item.next() == !0
@@ -84,7 +84,7 @@ fn test_get_head_entry() {
     cache.put(2, "two");
 
     let cache_head = cache.get(&2);
-    assert_eq!(cache_head.ok(), Some(&"two"));
+    assert_eq!(cache_head, Some(&"two"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
         item.id() == 1 && item.prev() == !0 && item.next() == 0
@@ -108,7 +108,7 @@ fn test_get_least_entry() {
     cache.put(3, "three");
 
     let cache_head = cache.get(&1);
-    assert_eq!(cache_head.ok(), Some(&"one"));
+    assert_eq!(cache_head, Some(&"one"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
         item.id() == 0 && item.prev() == !0 && item.next() == 2
@@ -137,7 +137,7 @@ fn test_get_middle_entry() {
     cache.put(3, "three");
 
     let cache_head = cache.get(&2);
-    assert_eq!(cache_head.ok(), Some(&"two"));
+    assert_eq!(cache_head, Some(&"two"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
         item.id() == 1 && item.prev() == !0 && item.next() == 2

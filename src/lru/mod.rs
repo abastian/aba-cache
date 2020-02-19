@@ -2,7 +2,6 @@ use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 mod storage;
 
-pub use storage::Error;
 use storage::Storage;
 
 #[cfg(test)]
@@ -32,7 +31,6 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     /// ```
     /// use aba_cache as cache;
     /// use cache::LruCache;
-    /// use cache::LruError;
     ///
     /// let mut cache = LruCache::new(2);
     ///
@@ -41,17 +39,17 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     /// cache.put(2, "c");
     /// cache.put(3, "d");
     ///
-    /// assert_eq!(cache.get(&1).err(), Some(LruError::KeyNotExist));
-    /// assert_eq!(cache.get(&2).ok(), Some(&"c"));
-    /// assert_eq!(cache.get(&3).ok(), Some(&"d"));
+    /// assert_eq!(cache.get(&1), None);
+    /// assert_eq!(cache.get(&2), Some(&"c"));
+    /// assert_eq!(cache.get(&3), Some(&"d"));
     /// ```
-    pub fn get(&mut self, key: &K) -> Result<&V, Error> {
+    pub fn get(&mut self, key: &K) -> Option<&V> {
         if self.map.is_empty() {
-            Err(Error::EmptyStorage)
+            None
         } else if let Some(&index) = self.map.get(key) {
             self.storage.get(index)
         } else {
-            Err(Error::KeyNotExist)
+            None
         }
     }
 
@@ -70,12 +68,12 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     /// assert_eq!(None, cache.put(2, "b"));
     /// assert_eq!(Some("b"), cache.put(2, "beta"));
     ///
-    /// assert_eq!(cache.get(&1).ok(), Some(&"a"));
-    /// assert_eq!(cache.get(&2).ok(), Some(&"beta"));
+    /// assert_eq!(cache.get(&1), Some(&"a"));
+    /// assert_eq!(cache.get(&2), Some(&"beta"));
     /// ```
     pub fn put(&mut self, key: K, value: V) -> Option<V> {
         if let Some(&index) = self.map.get(&key) {
-            self.storage.update(index, value).ok()
+            Some(self.storage.update(index, value))
         } else {
             let key = Rc::new(key);
             let (idx, old_pair) = self.storage.put(key.clone(), value);
