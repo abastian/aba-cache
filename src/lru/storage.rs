@@ -5,7 +5,6 @@ const NULL_SIGIL: usize = !0;
 #[derive(Debug, PartialEq)]
 pub enum Error {
     EmptyStorage,
-    FullStorage,
     InvalidIndex,
     KeyNotExist,
 }
@@ -14,14 +13,13 @@ pub(super) struct Storage<K, V> {
     entries: Vec<Entry<K, V>>,
 
     cap: usize,
-    next_id: usize,
+    len: usize,
 
     head: usize,
     tail: usize,
 }
 
 struct Entry<K, V> {
-    id: usize,
     key: K,
     data: V,
 
@@ -30,9 +28,8 @@ struct Entry<K, V> {
 }
 
 impl<K, V> Entry<K, V> {
-    fn new(id: usize, key: K, data: V, next: usize, prev: usize) -> Self {
+    fn new(key: K, data: V, next: usize, prev: usize) -> Self {
         Entry {
-            id,
             key,
             data,
             next,
@@ -46,7 +43,7 @@ impl<K, V> Storage<K, V> {
         Storage {
             entries: Vec::with_capacity(cap),
             cap,
-            next_id: 0,
+            len: 0,
             head: NULL_SIGIL,
             tail: NULL_SIGIL,
         }
@@ -57,11 +54,11 @@ impl<K, V> Storage<K, V> {
     // - new index,
     // - old pair key-value on update case or None on insert
     pub(super) fn put(&mut self, key: K, data: V) -> (usize, Option<(K, V)>) {
-        if self.next_id < self.cap {
+        if self.len < self.cap {
             // there's still room
-            let id = self.next_id;
-            self.next_id += 1;
-            let entry = Entry::new(id, key, data, self.head, NULL_SIGIL);
+            let id = self.len;
+            self.len += 1;
+            let entry = Entry::new(key, data, self.head, NULL_SIGIL);
             self.entries.insert(id, entry);
             if self.head != NULL_SIGIL {
                 self.entries[self.head].prev = id;
@@ -151,8 +148,8 @@ impl<K, V> Storage<K, V> {
             prev.next = target.next;
             target.next = self.head;
             target.prev = NULL_SIGIL;
-            head.prev = target.id;
-            self.head = target.id;
+            head.prev = index;
+            self.head = index;
             target
         };
         Ok(result)
@@ -174,20 +171,23 @@ pub(crate) struct Iter<'a, K, V> {
 }
 
 #[cfg(test)]
-pub(crate) struct IterEntry<'a, K, V>(&'a Entry<K, V>);
+pub(crate) struct IterEntry<'a, K, V> {
+    id: usize,
+    entry: &'a Entry<K, V>,
+}
 
 #[cfg(test)]
 impl<'a, K, V> IterEntry<'a, K, V> {
     pub(crate) fn id(&self) -> usize {
-        self.0.id
+        self.id
     }
 
     pub(crate) fn next(&self) -> usize {
-        self.0.next
+        self.entry.next
     }
 
     pub(crate) fn prev(&self) -> usize {
-        self.0.prev
+        self.entry.prev
     }
 }
 
@@ -199,8 +199,11 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
         if self.current == NULL_SIGIL {
             None
         } else {
-            let item = IterEntry(&self.storage.entries[self.current]);
-            self.current = item.0.next;
+            let item = IterEntry {
+                id: self.current,
+                entry: &self.storage.entries[self.current],
+            };
+            self.current = item.entry.next;
             Some(item)
         }
     }
