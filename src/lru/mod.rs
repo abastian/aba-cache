@@ -2,14 +2,14 @@ use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 mod storage;
 
-use storage::Storage;
+use storage::{Pointer, Storage};
 
 #[cfg(test)]
 mod tests;
 
 pub struct Cache<K, V> {
     storage: Storage<Rc<K>, V>,
-    map: HashMap<Rc<K>, usize>,
+    map: HashMap<Rc<K>, Pointer>,
 }
 
 impl<K: Hash + Eq, V> Cache<K, V> {

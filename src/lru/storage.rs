@@ -1,7 +1,25 @@
 use slab::Slab;
-use std::mem;
+use std::{
+    mem,
+    ops::{Index, IndexMut},
+};
 
-const NULL_SIGIL: usize = !0;
+#[derive(PartialEq, Copy, Clone)]
+pub(super) struct Pointer(pub(super) usize);
+
+impl Pointer {
+    // The null pointer is `!0`, which is the largest possible value of type
+    // `usize`. There's no way we'll ever have a legitimate index that large.
+    #[inline]
+    pub(super) fn null() -> Pointer {
+        Pointer(!0)
+    }
+    // Returns `true` if this pointer is null.
+    #[inline]
+    pub(super) fn is_null(self) -> bool {
+        self.0 == !0
+    }
+}
 
 pub(super) struct Storage<K, V> {
     entries: Slab<Entry<K, V>>,
@@ -9,20 +27,20 @@ pub(super) struct Storage<K, V> {
     cap: usize,
     len: usize,
 
-    head: usize,
-    tail: usize,
+    head: Pointer,
+    tail: Pointer,
 }
 
-struct Entry<K, V> {
+pub(super) struct Entry<K, V> {
     key: K,
     data: V,
 
-    next: usize,
-    prev: usize,
+    next: Pointer,
+    prev: Pointer,
 }
 
 impl<K, V> Entry<K, V> {
-    fn new(key: K, data: V, next: usize, prev: usize) -> Self {
+    fn new(key: K, data: V, next: Pointer, prev: Pointer) -> Self {
         Entry {
             key,
             data,
@@ -32,14 +50,28 @@ impl<K, V> Entry<K, V> {
     }
 }
 
+impl<K, V> Index<Pointer> for Storage<K, V> {
+    type Output = Entry<K, V>;
+
+    fn index(&self, index: Pointer) -> &Self::Output {
+        self.entries.index(index.0)
+    }
+}
+
+impl<K, V> IndexMut<Pointer> for Storage<K, V> {
+    fn index_mut(&mut self, index: Pointer) -> &mut Self::Output {
+        self.entries.index_mut(index.0)
+    }
+}
+
 impl<K, V> Storage<K, V> {
     pub(super) fn new(cap: usize) -> Self {
         Storage {
             entries: Slab::with_capacity(cap),
             cap,
             len: 0,
-            head: NULL_SIGIL,
-            tail: NULL_SIGIL,
+            head: Pointer::null(),
+            tail: Pointer::null(),
         }
     }
 
@@ -47,15 +79,15 @@ impl<K, V> Storage<K, V> {
     // return
     // - new index,
     // - old pair key-value on update case or None on insert
-    pub(super) fn put(&mut self, key: K, data: V) -> (usize, Option<(K, V)>) {
+    pub(super) fn put(&mut self, key: K, data: V) -> (Pointer, Option<(K, V)>) {
         if self.len < self.cap {
             // there's still room
-            let entry = Entry::new(key, data, self.head, NULL_SIGIL);
-            let id = self.entries.insert(entry);
-            if self.head != NULL_SIGIL {
-                self.entries[self.head].prev = id;
-            } else {
+            let entry = Entry::new(key, data, self.head, Pointer::null());
+            let id = Pointer(self.entries.insert(entry));
+            if self.head.is_null() {
                 self.tail = id;
+            } else {
+                self.entries[self.head.0].prev = id;
             }
             self.head = id;
             self.len += 1;
@@ -64,9 +96,9 @@ impl<K, V> Storage<K, V> {
             let id = self.tail;
             let tail = if self.head == id {
                 // single content, already on top
-                &mut self.entries[id]
+                &mut self.entries[id.0]
             } else {
-                unsafe { self.move_to_top(self.tail) }
+                self.move_to_top(self.tail)
             };
             let old_key = mem::replace(&mut tail.key, key);
             let old_data = mem::replace(&mut tail.data, data);
@@ -74,25 +106,25 @@ impl<K, V> Storage<K, V> {
         }
     }
 
-    pub(super) fn update(&mut self, index: usize, data: V) -> V {
-        let tail = if self.head == index {
+    pub(super) fn update(&mut self, ptr: Pointer, data: V) -> V {
+        let tail = if self.head == ptr {
             // single content, already on top
-            self.entries.get_mut(index).unwrap()
+            self.entries.get_mut(ptr.0).unwrap()
         } else {
-            unsafe { self.move_to_top(index) }
+            self.move_to_top(ptr)
         };
         mem::replace(&mut tail.data, data)
     }
 
-    pub(super) fn get(&mut self, index: usize) -> Option<&V> {
+    pub(super) fn get(&mut self, ptr: Pointer) -> Option<&V> {
         // valid range for index
-        if self.head == NULL_SIGIL {
+        if self.head == Pointer::null() {
             // empty list
             None
-        } else if index == self.head {
-            self.entries.get(index).map(|entry| &entry.data)
+        } else if ptr == self.head {
+            self.entries.get(ptr.0).map(|entry| &entry.data)
         } else {
-            Some(&unsafe { self.move_to_top(index) }.data)
+            Some(&self.move_to_top(ptr).data)
         }
     }
 
@@ -101,40 +133,32 @@ impl<K, V> Storage<K, V> {
     }
 
     /// Move entry at index to head position
-    ///
-    /// # Safety
-    ///
-    /// It is undefined behaviour to call this function when any pointer
-    /// is out of bound.
-    unsafe fn move_to_top(&mut self, index: usize) -> &mut Entry<K, V> {
-        // need to access elements inside as mutable,
-        // on normal condition, rust can't borrow multiple mutable elements
-        // on one container at one time
-        let target = &mut *(self.entries.get_unchecked_mut(index) as *mut Entry<K, V>);
-        let next = if target.next != NULL_SIGIL {
-            Some(&mut *(self.entries.get_unchecked_mut(target.next) as *mut Entry<K, V>))
-        } else {
-            None
+    fn move_to_top(&mut self, ptr: Pointer) -> &mut Entry<K, V> {
+        let (next, prev) = {
+            let target = &self[ptr];
+            (target.next, target.prev)
         };
-        let prev = &mut *(self.entries.get_unchecked_mut(target.prev) as *mut Entry<K, V>);
-        let head = &mut *(self.entries.get_unchecked_mut(self.head) as *mut Entry<K, V>);
+        let head = self.head;
 
-        if let Some(next) = next {
-            next.prev = target.prev;
-        } else {
+        if next.is_null() {
             // target is the tail, need to move tail to prev
-            self.tail = target.prev;
+            self.tail = prev;
+        } else {
+            self[next].prev = prev;
         }
-        prev.next = target.next;
-        target.next = self.head;
-        target.prev = NULL_SIGIL;
-        head.prev = index;
-        self.head = index;
-        target
+        self[prev].next = next;
+        self[head].prev = ptr;
+        self.head = ptr;
+        {
+            let target = &mut self[ptr];
+            target.next = head;
+            target.prev = Pointer::null();
+            target
+        }
     }
 
     #[cfg(test)]
-    pub(crate) fn iter<'a>(&'a self) -> Iter<'a, K, V> {
+    pub(super) fn iter<'a>(&'a self) -> Iter<'a, K, V> {
         Iter {
             storage: self,
             current: self.head,
@@ -143,28 +167,28 @@ impl<K, V> Storage<K, V> {
 }
 
 #[cfg(test)]
-pub(crate) struct Iter<'a, K, V> {
+pub(super) struct Iter<'a, K, V> {
     storage: &'a Storage<K, V>,
-    current: usize,
+    current: Pointer,
 }
 
 #[cfg(test)]
-pub(crate) struct IterEntry<'a, K, V> {
+pub(super) struct IterEntry<'a, K, V> {
     id: usize,
     entry: &'a Entry<K, V>,
 }
 
 #[cfg(test)]
 impl<'a, K, V> IterEntry<'a, K, V> {
-    pub(crate) fn id(&self) -> usize {
+    pub(super) fn id(&self) -> usize {
         self.id
     }
 
-    pub(crate) fn next(&self) -> usize {
+    pub(super) fn next(&self) -> Pointer {
         self.entry.next
     }
 
-    pub(crate) fn prev(&self) -> usize {
+    pub(super) fn prev(&self) -> Pointer {
         self.entry.prev
     }
 }
@@ -174,12 +198,12 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = IterEntry<'a, K, V>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current == NULL_SIGIL {
+        if self.current.is_null() {
             None
         } else {
             let item = IterEntry {
-                id: self.current,
-                entry: &self.storage.entries[self.current],
+                id: self.current.0,
+                entry: &self.storage.entries[self.current.0],
             };
             self.current = item.entry.next;
             Some(item)
