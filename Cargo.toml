@@ -5,3 +5,4 @@ authors = ["Arief Bastian HB <ariefbastian@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+slab = "0.4"

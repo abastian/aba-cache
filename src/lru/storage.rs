@@ -1,9 +1,10 @@
+use slab::Slab;
 use std::mem;
 
 const NULL_SIGIL: usize = !0;
 
 pub(super) struct Storage<K, V> {
-    entries: Vec<Entry<K, V>>,
+    entries: Slab<Entry<K, V>>,
 
     cap: usize,
     len: usize,
@@ -34,7 +35,7 @@ impl<K, V> Entry<K, V> {
 impl<K, V> Storage<K, V> {
     pub(super) fn new(cap: usize) -> Self {
         Storage {
-            entries: Vec::with_capacity(cap),
+            entries: Slab::with_capacity(cap),
             cap,
             len: 0,
             head: NULL_SIGIL,
@@ -49,16 +50,15 @@ impl<K, V> Storage<K, V> {
     pub(super) fn put(&mut self, key: K, data: V) -> (usize, Option<(K, V)>) {
         if self.len < self.cap {
             // there's still room
-            let id = self.len;
-            self.len += 1;
             let entry = Entry::new(key, data, self.head, NULL_SIGIL);
-            self.entries.insert(id, entry);
+            let id = self.entries.insert(entry);
             if self.head != NULL_SIGIL {
                 self.entries[self.head].prev = id;
             } else {
                 self.tail = id;
             }
             self.head = id;
+            self.len += 1;
             (id, None)
         } else {
             let id = self.tail;
