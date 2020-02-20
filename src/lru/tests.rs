@@ -64,12 +64,12 @@ fn test_reuse_last_entry() {
     assert_eq!(cache.len(), 2);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.id() == 0 && item.prev().is_null() && item.next().0 == 1
+        item.id() == 0 && item.prev().is_null() && item.next().0.unwrap() == 1
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.id() == 1 && item.prev().0 == 0 && item.next().is_null()
+        item.id() == 1 && item.prev().0.unwrap() == 0 && item.next().is_null()
     } else {
         false
     });
@@ -87,12 +87,12 @@ fn test_get_head_entry() {
     assert_eq!(cache_head, Some(&"two"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.id() == 1 && item.prev().is_null() && item.next().0 == 0
+        item.id() == 1 && item.prev().is_null() && item.next().0.unwrap() == 0
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.id() == 0 && item.prev().0 == 1 && item.next().is_null()
+        item.id() == 0 && item.prev().0.unwrap() == 1 && item.next().is_null()
     } else {
         false
     });
@@ -111,17 +111,17 @@ fn test_get_least_entry() {
     assert_eq!(cache_head, Some(&"one"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.id() == 0 && item.prev().is_null() && item.next().0 == 2
+        item.id() == 0 && item.prev().is_null() && item.next().0.unwrap() == 2
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.id() == 2 && item.prev().0 == 0 && item.next().0 == 1
+        item.id() == 2 && item.prev().0.unwrap() == 0 && item.next().0.unwrap() == 1
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.id() == 1 && item.prev().0 == 2 && item.next().is_null()
+        item.id() == 1 && item.prev().0.unwrap() == 2 && item.next().is_null()
     } else {
         false
     });
@@ -140,17 +140,17 @@ fn test_get_middle_entry() {
     assert_eq!(cache_head, Some(&"two"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.id() == 1 && item.prev().is_null() && item.next().0 == 2
+        item.id() == 1 && item.prev().is_null() && item.next().0.unwrap() == 2
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.id() == 2 && item.prev().0 == 1 && item.next().0 == 0
+        item.id() == 2 && item.prev().0.unwrap() == 1 && item.next().0.unwrap() == 0
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.id() == 0 && item.prev().0 == 2 && item.next().is_null()
+        item.id() == 0 && item.prev().0.unwrap() == 2 && item.next().is_null()
     } else {
         false
     });

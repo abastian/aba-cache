@@ -5,19 +5,19 @@ use std::{
 };
 
 #[derive(PartialEq, Copy, Clone)]
-pub(super) struct Pointer(pub(super) usize);
+pub(super) struct Pointer(pub(super) Option<usize>);
 
 impl Pointer {
     // The null pointer is `!0`, which is the largest possible value of type
     // `usize`. There's no way we'll ever have a legitimate index that large.
     #[inline]
     pub(super) fn null() -> Pointer {
-        Pointer(!0)
+        Pointer(None)
     }
     // Returns `true` if this pointer is null.
     #[inline]
     pub(super) fn is_null(self) -> bool {
-        self.0 == !0
+        self.0.is_none()
     }
 }
 
@@ -54,13 +54,13 @@ impl<K, V> Index<Pointer> for Storage<K, V> {
     type Output = Entry<K, V>;
 
     fn index(&self, index: Pointer) -> &Self::Output {
-        self.entries.index(index.0)
+        self.entries.index(index.0.unwrap())
     }
 }
 
 impl<K, V> IndexMut<Pointer> for Storage<K, V> {
     fn index_mut(&mut self, index: Pointer) -> &mut Self::Output {
-        self.entries.index_mut(index.0)
+        self.entries.index_mut(index.0.unwrap())
     }
 }
 
@@ -83,11 +83,11 @@ impl<K, V> Storage<K, V> {
         if self.len < self.cap {
             // there's still room
             let entry = Entry::new(key, data, self.head, Pointer::null());
-            let id = Pointer(self.entries.insert(entry));
+            let id = Pointer(Some(self.entries.insert(entry)));
             if self.head.is_null() {
                 self.tail = id;
             } else {
-                self.entries[self.head.0].prev = id;
+                self.entries[self.head.0.unwrap()].prev = id;
             }
             self.head = id;
             self.len += 1;
@@ -96,7 +96,7 @@ impl<K, V> Storage<K, V> {
             let id = self.tail;
             let tail = if self.head == id {
                 // single content, already on top
-                &mut self.entries[id.0]
+                &mut self.entries[id.0.unwrap()]
             } else {
                 self.move_to_top(self.tail)
             };
@@ -109,7 +109,7 @@ impl<K, V> Storage<K, V> {
     pub(super) fn update(&mut self, ptr: Pointer, data: V) -> V {
         let tail = if self.head == ptr {
             // single content, already on top
-            self.entries.get_mut(ptr.0).unwrap()
+            self.entries.get_mut(ptr.0.unwrap()).unwrap()
         } else {
             self.move_to_top(ptr)
         };
@@ -118,11 +118,11 @@ impl<K, V> Storage<K, V> {
 
     pub(super) fn get(&mut self, ptr: Pointer) -> Option<&V> {
         // valid range for index
-        if self.head == Pointer::null() {
+        if self.head.is_null() {
             // empty list
             None
         } else if ptr == self.head {
-            self.entries.get(ptr.0).map(|entry| &entry.data)
+            self.entries.get(ptr.0.unwrap()).map(|entry| &entry.data)
         } else {
             Some(&self.move_to_top(ptr).data)
         }
@@ -201,9 +201,10 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
         if self.current.is_null() {
             None
         } else {
+            let id = self.current.0.unwrap();
             let item = IterEntry {
-                id: self.current.0,
-                entry: &self.storage.entries[self.current.0],
+                id,
+                entry: &self.storage.entries[id],
             };
             self.current = item.entry.next;
             Some(item)
