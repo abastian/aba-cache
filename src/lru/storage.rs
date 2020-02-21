@@ -5,7 +5,13 @@ use std::{
 };
 
 #[derive(PartialEq, Copy, Clone)]
-pub(super) struct Pointer(pub(super) Option<usize>);
+pub(super) struct InternalPointer {
+    pub(super) slab: usize,
+    pub(super) pos: usize,
+}
+
+#[derive(PartialEq, Copy, Clone)]
+pub(super) struct Pointer(pub(super) Option<InternalPointer>);
 
 impl Pointer {
     // The null pointer is `!0`, which is the largest possible value of type
@@ -22,7 +28,7 @@ impl Pointer {
 }
 
 pub(super) struct Storage<K, V> {
-    entries: Slab<Entry<K, V>>,
+    entries: Vec<Slab<Entry<K, V>>>,
 
     cap: usize,
     len: usize,
@@ -54,20 +60,22 @@ impl<K, V> Index<Pointer> for Storage<K, V> {
     type Output = Entry<K, V>;
 
     fn index(&self, index: Pointer) -> &Self::Output {
-        self.entries.index(index.0.unwrap())
+        let internal = index.0.unwrap();
+        self.entries[internal.slab].index(internal.pos)
     }
 }
 
 impl<K, V> IndexMut<Pointer> for Storage<K, V> {
     fn index_mut(&mut self, index: Pointer) -> &mut Self::Output {
-        self.entries.index_mut(index.0.unwrap())
+        let internal = index.0.unwrap();
+        self.entries[internal.slab].index_mut(internal.pos)
     }
 }
 
 impl<K, V> Storage<K, V> {
     pub(super) fn new(cap: usize) -> Self {
         Storage {
-            entries: Slab::with_capacity(cap),
+            entries: vec![Slab::with_capacity(cap)],
             cap,
             len: 0,
             head: Pointer::null(),
@@ -83,11 +91,16 @@ impl<K, V> Storage<K, V> {
         if self.len < self.cap {
             // there's still room
             let entry = Entry::new(key, data, self.head, Pointer::null());
-            let id = Pointer(Some(self.entries.insert(entry)));
+            let slab = 0; // todo trace active slab
+            let id = Pointer(Some(InternalPointer {
+                slab,
+                pos: self.entries[slab].insert(entry),
+            }));
             if self.head.is_null() {
                 self.tail = id;
             } else {
-                self.entries[self.head.0.unwrap()].prev = id;
+                let idx = self.head;
+                self[idx].prev = id;
             }
             self.head = id;
             self.len += 1;
@@ -96,7 +109,7 @@ impl<K, V> Storage<K, V> {
             let id = self.tail;
             let tail = if self.head == id {
                 // single content, already on top
-                &mut self.entries[id.0.unwrap()]
+                &mut self[id]
             } else {
                 self.move_to_top(self.tail)
             };
@@ -109,7 +122,7 @@ impl<K, V> Storage<K, V> {
     pub(super) fn update(&mut self, ptr: Pointer, data: V) -> V {
         let tail = if self.head == ptr {
             // single content, already on top
-            self.entries.get_mut(ptr.0.unwrap()).unwrap()
+            &mut self[ptr]
         } else {
             self.move_to_top(ptr)
         };
@@ -122,7 +135,7 @@ impl<K, V> Storage<K, V> {
             // empty list
             None
         } else if ptr == self.head {
-            self.entries.get(ptr.0.unwrap()).map(|entry| &entry.data)
+            Some(&self[ptr].data)
         } else {
             Some(&self.move_to_top(ptr).data)
         }
@@ -174,14 +187,14 @@ pub(super) struct Iter<'a, K, V> {
 
 #[cfg(test)]
 pub(super) struct IterEntry<'a, K, V> {
-    id: usize,
+    ptr: Pointer,
     entry: &'a Entry<K, V>,
 }
 
 #[cfg(test)]
 impl<'a, K, V> IterEntry<'a, K, V> {
-    pub(super) fn id(&self) -> usize {
-        self.id
+    pub(super) fn ptr(&self) -> Pointer {
+        self.ptr
     }
 
     pub(super) fn next(&self) -> Pointer {
@@ -201,10 +214,10 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
         if self.current.is_null() {
             None
         } else {
-            let id = self.current.0.unwrap();
+            let ptr = self.current;
             let item = IterEntry {
-                id,
-                entry: &self.storage.entries[id],
+                ptr,
+                entry: &self.storage[ptr],
             };
             self.current = item.entry.next;
             Some(item)
