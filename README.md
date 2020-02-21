@@ -19,7 +19,7 @@ and on your main.rs
 use aba_cache as cache;
 
 fn main() {
-    let mut cache = cache::LruCache::<usize, &str>::new(4);
+    let mut cache = cache::LruCache::<usize, &str>::new(2);
 
     cache.put(1, "a");
     cache.put(2, "b");

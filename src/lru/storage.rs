@@ -16,7 +16,7 @@ impl Pointer {
     }
     // Returns `true` if this pointer is null.
     #[inline]
-    pub(super) fn is_null(self) -> bool {
+    pub(super) fn is_null(&self) -> bool {
         self.0.is_none()
     }
 }
