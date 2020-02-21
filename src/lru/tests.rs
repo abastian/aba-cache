@@ -1,5 +1,4 @@
 use super::*;
-use crate::lru::storage::InternalPointer;
 
 #[test]
 #[should_panic]
@@ -24,7 +23,7 @@ fn test_get_uncached_key() {
     assert_eq!(cache.get(&2), None);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 0 }
             && item.prev().is_null()
             && item.next().is_null()
     } else {
@@ -45,7 +44,7 @@ fn test_reuse_single_entry() {
     assert_eq!(cache.len(), 1);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 0 }
             && item.prev().is_null()
             && item.next().is_null()
     } else {
@@ -69,15 +68,15 @@ fn test_reuse_last_entry() {
     assert_eq!(cache.len(), 2);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 0 }
             && item.prev().is_null()
-            && item.next() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
+            && item.next() == Pointer::InternalPointer { slab: 0, pos: 1 }
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
-            && item.prev() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 1 }
+            && item.prev() == Pointer::InternalPointer { slab: 0, pos: 0 }
             && item.next().is_null()
     } else {
         false
@@ -96,15 +95,15 @@ fn test_get_head_entry() {
     assert_eq!(cache_head, Some(&"two"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 1 }
             && item.prev().is_null()
-            && item.next() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
+            && item.next() == Pointer::InternalPointer { slab: 0, pos: 0 }
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
-            && item.prev() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 0 }
+            && item.prev() == Pointer::InternalPointer { slab: 0, pos: 1 }
             && item.next().is_null()
     } else {
         false
@@ -124,22 +123,22 @@ fn test_get_least_entry() {
     assert_eq!(cache_head, Some(&"one"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 0 }
             && item.prev().is_null()
-            && item.next() == Pointer(Some(InternalPointer { slab: 0, pos: 2 }))
+            && item.next() == Pointer::InternalPointer { slab: 0, pos: 2 }
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 2 }))
-            && item.prev() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
-            && item.next() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 2 }
+            && item.prev() == Pointer::InternalPointer { slab: 0, pos: 0 }
+            && item.next() == Pointer::InternalPointer { slab: 0, pos: 1 }
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
-            && item.prev() == Pointer(Some(InternalPointer { slab: 0, pos: 2 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 1 }
+            && item.prev() == Pointer::InternalPointer { slab: 0, pos: 2 }
             && item.next().is_null()
     } else {
         false
@@ -159,22 +158,22 @@ fn test_get_middle_entry() {
     assert_eq!(cache_head, Some(&"two"));
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 1 }
             && item.prev().is_null()
-            && item.next() == Pointer(Some(InternalPointer { slab: 0, pos: 2 }))
+            && item.next() == Pointer::InternalPointer { slab: 0, pos: 2 }
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 2 }))
-            && item.prev() == Pointer(Some(InternalPointer { slab: 0, pos: 1 }))
-            && item.next() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 2 }
+            && item.prev() == Pointer::InternalPointer { slab: 0, pos: 1 }
+            && item.next() == Pointer::InternalPointer { slab: 0, pos: 0 }
     } else {
         false
     });
     assert!(if let Some(item) = iter.next() {
-        item.ptr() == Pointer(Some(InternalPointer { slab: 0, pos: 0 }))
-            && item.prev() == Pointer(Some(InternalPointer { slab: 0, pos: 2 }))
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 0 }
+            && item.prev() == Pointer::InternalPointer { slab: 0, pos: 2 }
             && item.next().is_null()
     } else {
         false
