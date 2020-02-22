@@ -87,10 +87,10 @@ impl<K, V> Storage<K, V> {
         }
     }
 
-    // Insert a key-value.
-    // return
-    // - new index,
-    // - old pair key-value on update case or None on insert
+    /// Insert a key-value.
+    /// return two data on a tuple
+    /// - new index,
+    /// - old pair key-value on update case or None on insert
     pub(super) fn put(&mut self, key: K, data: V) -> (Pointer, Option<(K, V)>) {
         if self.len < self.cap {
             // there's still room
@@ -123,22 +123,23 @@ impl<K, V> Storage<K, V> {
         }
     }
 
+    /// Update the data associated with given pointer and move it
+    /// to the top of the LRU list, if not already there.
     pub(super) fn update(&mut self, ptr: Pointer, data: V) -> V {
-        let tail = if self.head == ptr {
+        let top = if self.head == ptr {
             // single content, already on top
             &mut self[ptr]
         } else {
             self.move_to_top(ptr)
         };
-        mem::replace(&mut tail.data, data)
+        mem::replace(&mut top.data, data)
     }
 
+    /// Return the data associated with given pointer and move it
+    /// to the top of the LRU list, if not already there.
     pub(super) fn get(&mut self, ptr: Pointer) -> Option<&V> {
-        // valid range for index
-        if self.head.is_null() {
-            // empty list
-            None
-        } else if ptr == self.head {
+        if ptr == self.head {
+            // already on top
             Some(&self[ptr].data)
         } else {
             Some(&self.move_to_top(ptr).data)
@@ -149,7 +150,7 @@ impl<K, V> Storage<K, V> {
         self.cap
     }
 
-    /// Move entry at index to head position
+    /// Move entry at pointer to the top of LRU list.
     fn move_to_top(&mut self, ptr: Pointer) -> &mut Entry<K, V> {
         let (next, prev) = {
             let target = &self[ptr];

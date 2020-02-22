@@ -12,3 +12,7 @@ Cargo.lock
 # These are Visual Studio Code configuration
 /.devcontainer/
 /.vscode/
+
+# These are Intellij IDEA configuration
+/.idea/
+*.iml
