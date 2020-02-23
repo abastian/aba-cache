@@ -2,6 +2,7 @@ use slab::Slab;
 use std::{
     mem,
     ops::{Index, IndexMut},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 #[derive(PartialEq, Copy, Clone)]
@@ -24,17 +25,20 @@ impl Pointer {
 }
 
 pub(super) struct Storage<K, V> {
-    entries: Vec<Slab<Entry<K, V>>>,
+    slabs: Slab<Slab<Entry<K, V>>>,
 
     cap: usize,
     len: usize,
 
     head: Pointer,
     tail: Pointer,
+
+    timeout_secs: u64,
 }
 
 pub(super) struct Entry<K, V> {
     key: K,
+    timestamp: u64,
     data: V,
 
     next: Pointer,
@@ -43,8 +47,13 @@ pub(super) struct Entry<K, V> {
 
 impl<K, V> Entry<K, V> {
     fn new(key: K, data: V, next: Pointer, prev: Pointer) -> Self {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         Entry {
             key,
+            timestamp,
             data,
             next,
             prev,
@@ -58,7 +67,7 @@ impl<K, V> Index<Pointer> for Storage<K, V> {
 
     fn index(&self, index: Pointer) -> &Self::Output {
         if let Pointer::InternalPointer { slab, pos } = index {
-            self.entries[slab].index(pos)
+            self.slabs[slab].index(pos)
         } else {
             panic!("indexing on null pointer");
         }
@@ -69,7 +78,7 @@ impl<K, V> Index<Pointer> for Storage<K, V> {
 impl<K, V> IndexMut<Pointer> for Storage<K, V> {
     fn index_mut(&mut self, index: Pointer) -> &mut Self::Output {
         if let Pointer::InternalPointer { slab, pos } = index {
-            self.entries[slab].index_mut(pos)
+            self.slabs[slab].index_mut(pos)
         } else {
             panic!("indexing on null pointer");
         }
@@ -77,13 +86,16 @@ impl<K, V> IndexMut<Pointer> for Storage<K, V> {
 }
 
 impl<K, V> Storage<K, V> {
-    pub(super) fn new(cap: usize) -> Self {
+    pub(super) fn new(cap: usize, timeout_secs: u64) -> Self {
+        let mut slabs = Slab::new();
+        slabs.insert(Slab::with_capacity(cap));
         Storage {
-            entries: vec![Slab::with_capacity(cap)],
+            slabs,
             cap,
             len: 0,
             head: Pointer::null(),
             tail: Pointer::null(),
+            timeout_secs,
         }
     }
 
@@ -92,35 +104,57 @@ impl<K, V> Storage<K, V> {
     /// - new index,
     /// - old pair key-value on update case or None on insert
     pub(super) fn put(&mut self, key: K, data: V) -> (Pointer, Option<(K, V)>) {
-        if self.len < self.cap {
-            // there's still room
-            let entry = Entry::new(key, data, self.head, Pointer::null());
-            let slab = 0; // todo trace active slab
-            let id = Pointer::InternalPointer {
-                slab,
-                pos: self.entries[slab].insert(entry),
-            };
-            if self.head.is_null() {
-                self.tail = id;
-            } else {
-                let idx = self.head;
-                self[idx].prev = id;
+        if !self.tail.is_null() {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            let ptr = self.tail;
+            // update expired entry
+            if self[ptr].timestamp + self.timeout_secs <= now {
+                let tail = if self.head == ptr {
+                    // single content, already on top
+                    &mut self[ptr]
+                } else {
+                    self.move_to_top(self.tail)
+                };
+                let old_key = mem::replace(&mut tail.key, key);
+                let old_data = mem::replace(&mut tail.data, data);
+                return (ptr, Some((old_key, old_data)));
             }
-            self.head = id;
-            self.len += 1;
-            (id, None)
-        } else {
-            let id = self.tail;
-            let tail = if self.head == id {
-                // single content, already on top
-                &mut self[id]
-            } else {
-                self.move_to_top(self.tail)
-            };
-            let old_key = mem::replace(&mut tail.key, key);
-            let old_data = mem::replace(&mut tail.data, data);
-            (id, Some((old_key, old_data)))
         }
+
+        // allocate new slab if necessary
+        let slab = {
+            let mut slab_id = None;
+            for (key, data) in self.slabs.iter() {
+                if data.len() < data.capacity() {
+                    slab_id = Some(key);
+                    break;
+                }
+            }
+            if let Some(slab_id) = slab_id {
+                slab_id
+            } else {
+                self.slabs.insert(Slab::with_capacity(self.cap))
+            }
+        };
+
+        // insert entry
+        let entry = Entry::new(key, data, self.head, Pointer::null());
+        let id = Pointer::InternalPointer {
+            slab,
+            pos: self.slabs[slab].insert(entry),
+        };
+        if self.head.is_null() {
+            self.tail = id;
+        } else {
+            let idx = self.head;
+            self[idx].prev = id;
+        }
+        self.head = id;
+        self.len += 1;
+        (id, None)
     }
 
     /// Update the data associated with given pointer and move it
@@ -147,7 +181,7 @@ impl<K, V> Storage<K, V> {
     }
 
     pub(super) fn capacity(&self) -> usize {
-        self.cap
+        self.slabs.iter().map(|(_, slab)| slab.capacity()).sum()
     }
 
     /// Move entry at pointer to the top of LRU list.
