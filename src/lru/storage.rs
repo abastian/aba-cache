@@ -120,6 +120,7 @@ impl<K, V> Storage<K, V> {
                 };
                 let old_key = mem::replace(&mut tail.key, key);
                 let old_data = mem::replace(&mut tail.data, data);
+                tail.timestamp = now;
                 return (ptr, Some((old_key, old_data)));
             }
         }
@@ -166,17 +167,28 @@ impl<K, V> Storage<K, V> {
         } else {
             self.move_to_top(ptr)
         };
+        top.timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         mem::replace(&mut top.data, data)
     }
 
     /// Return the data associated with given pointer and move it
     /// to the top of the LRU list, if not already there.
     pub(super) fn get(&mut self, ptr: Pointer) -> Option<&V> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         if ptr == self.head {
             // already on top
+            self[ptr].timestamp = now;
             Some(&self[ptr].data)
         } else {
-            Some(&self.move_to_top(ptr).data)
+            let top = self.move_to_top(ptr);
+            top.timestamp = now;
+            Some(&top.data)
         }
     }
 

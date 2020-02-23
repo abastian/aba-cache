@@ -92,6 +92,9 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     }
 
     /// Returns the maximum number of key-value pairs the cache can hold.
+    /// Note that on data insertion, when no space is available and no
+    /// entry is timeout, then capacity will be added with `multiply_cap`
+    /// to accomodate.
     ///
     /// # Example
     ///
@@ -101,12 +104,22 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     ///
     /// let mut cache: LruCache<usize, &str> = LruCache::new(2, 60);
     /// assert_eq!(cache.capacity(), 2);
+    ///
+    /// cache.put(1, "a");
+    /// assert_eq!(cache.capacity(), 2);
+    ///
+    /// cache.put(2, "b");
+    /// assert_eq!(cache.capacity(), 2);
+    ///
+    /// cache.put(3, "c");
+    /// assert_eq!(cache.capacity(), 4);
     /// ```
     pub fn capacity(&self) -> usize {
         self.storage.capacity()
     }
 
     /// Returns the number of key-value pairs that are currently in the the cache.
+    /// Note that len should be less than or equal to capacity
     ///
     /// # Example
     ///
@@ -122,9 +135,11 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     ///
     /// cache.put(2, "b");
     /// assert_eq!(cache.len(), 2);
+    /// assert_eq!(cache.capacity(), 2);
     ///
     /// cache.put(3, "c");
     /// assert_eq!(cache.len(), 3);
+    /// assert_eq!(cache.capacity(), 4);
     /// ```
     pub fn len(&self) -> usize {
         self.map.len()
