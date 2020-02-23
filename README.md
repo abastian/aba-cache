@@ -19,14 +19,16 @@ and on your main.rs
 use aba_cache as cache;
 
 fn main() {
-    let mut cache = cache::LruCache::<usize, &str>::new(2);
+    // create Cache, with multiple_cap set to 2
+    // and entry will be timeout after 10 seconds
+    let mut cache = cache::LruCache::<usize, &str>::new(2, 10);
 
     cache.put(1, "a");
     cache.put(2, "b");
     cache.put(2, "c");
     cache.put(3, "d");
 
-    assert_eq!(cache.get(&1), None);
+    assert_eq!(cache.get(&1), Some(&"a"));
     assert_eq!(cache.get(&2), Some(&"c"));
     assert_eq!(cache.get(&3), Some(&"d"));
 }
