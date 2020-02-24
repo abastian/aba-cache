@@ -50,7 +50,11 @@ impl<K: Hash + Eq, V> Cache<K, V> {
         if self.map.is_empty() {
             None
         } else if let Some(&index) = self.map.get(key) {
-            self.storage.get(index)
+            let result = self.storage.get(index);
+            if result.is_none() {
+                self.map.remove(key);
+            }
+            result
         } else {
             None
         }

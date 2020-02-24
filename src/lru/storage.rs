@@ -181,7 +181,10 @@ impl<K, V> Storage<K, V> {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        if ptr == self.head {
+        if self[ptr].timestamp + self.timeout_secs <= now {
+            self.remove(ptr);
+            None
+        } else if ptr == self.head {
             // already on top
             self[ptr].timestamp = now;
             Some(&self[ptr].data)
@@ -218,6 +221,38 @@ impl<K, V> Storage<K, V> {
             target.next = head;
             target.prev = Pointer::null();
             target
+        }
+    }
+
+    fn remove(&mut self, ptr: Pointer) {
+        let (next, prev) = {
+            let target = &self[ptr];
+            (target.next, target.prev)
+        };
+        let head = self.head;
+        let tail = self.tail;
+
+        if ptr == head {
+            self.head = next;
+        }
+
+        if ptr == tail {
+            self.tail = prev;
+        }
+
+        if !next.is_null() {
+            self[next].prev = prev;
+        }
+
+        if !prev.is_null() {
+            self[prev].next = next;
+        }
+
+        if let Pointer::InternalPointer { slab, pos } = ptr {
+            self.slabs[slab].remove(pos);
+            if self.slabs[slab].is_empty() {
+                self.slabs.remove(slab);
+            }
         }
     }
 
