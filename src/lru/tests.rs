@@ -204,3 +204,23 @@ fn test_get_middle_entry() {
     });
     assert!(iter.next().is_none());
 }
+
+#[test]
+fn test_get_expire_entry() {
+    let mut cache = Cache::<usize, &str>::new(2, 1);
+
+    cache.put(1, "one");
+    cache.put(2, "two");
+    cache.put(3, "three");
+
+    let cache_head = cache.get(&2);
+    assert_eq!(cache_head, Some(&"two"));
+
+    thread::sleep(Duration::from_secs(1));
+    assert_eq!(cache.get(&1), None);
+    assert_eq!(cache.get(&2), None);
+    assert_eq!(cache.get(&3), None);
+    let mut iter = cache.storage.iter();
+    assert!(iter.next().is_none());
+    assert!(cache.is_empty());
+}
