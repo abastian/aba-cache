@@ -217,10 +217,23 @@ fn test_get_expire_entry() {
     assert_eq!(cache_head, Some(&"two"));
 
     thread::sleep(Duration::from_secs(1));
-    assert_eq!(cache.get(&1), None);
     assert_eq!(cache.get(&2), None);
-    assert_eq!(cache.get(&3), None);
     let mut iter = cache.storage.iter();
+    assert!(if let Some(item) = iter.next() {
+        item.ptr() == Pointer::InternalPointer { slab: 1, pos: 0 }
+            && item.prev().is_null()
+            && item.next() == Pointer::InternalPointer { slab: 0, pos: 0 }
+    } else {
+        false
+    });
+    assert!(if let Some(item) = iter.next() {
+        item.ptr() == Pointer::InternalPointer { slab: 0, pos: 0 }
+            && item.prev() == Pointer::InternalPointer { slab: 1, pos: 0 }
+            && item.next().is_null()
+    } else {
+        false
+    });
     assert!(iter.next().is_none());
-    assert!(cache.is_empty());
+    assert_eq!(cache.len(), 2);
+    assert_eq!(cache.capacity(), 4);
 }

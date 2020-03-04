@@ -1,5 +1,6 @@
-use std::{collections::HashMap, hash::Hash, rc::Rc};
+use std::{borrow::Borrow, collections::HashMap, hash::Hash, rc::Rc};
 
+pub(crate) mod asynchronous;
 mod storage;
 
 use storage::{Pointer, Storage};
@@ -46,7 +47,11 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     /// assert_eq!(cache.get(&2), Some(&"c"));
     /// assert_eq!(cache.get(&3), Some(&"d"));
     /// ```
-    pub fn get(&mut self, key: &K) -> Option<&V> {
+    pub fn get<'a, Q: ?Sized>(&'a mut self, key: &Q) -> Option<&'a V>
+    where
+        Rc<K>: Borrow<Q>,
+        Q: Hash + Eq,
+    {
         if self.map.is_empty() {
             None
         } else if let Some(&index) = self.map.get(key) {

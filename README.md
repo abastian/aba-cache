@@ -34,8 +34,7 @@ fn main() {
 }
 ```
 
-NB
-If you have difficulty when running cargo build with error something like "[failed to authenticate when downloading repository](https://github.com/rust-lang/cargo/issues/3381)", do following:
+**NB:** If you have difficulty when running cargo build with error something like "[failed to authenticate when downloading repository](https://github.com/rust-lang/cargo/issues/3381)", do following:
 
 - add these lines to ~/.gitconfig
 
