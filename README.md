@@ -11,9 +11,12 @@ Add following dependencies to Cargo.toml
 ```toml
 [dependencies]
 aba-cache = { git = "https://github.com/abastian/aba-cache", branch = "develop" }
+tokio = { version = "0.2", features = ["macros", "rt-core"] }
 ```
 
-and on your main.rs
+### Basic LRU Cache
+
+on your main.rs
 
 ```rust
 use aba_cache as cache;
@@ -31,6 +34,30 @@ fn main() {
     assert_eq!(cache.get(&1), Some(&"a"));
     assert_eq!(cache.get(&2), Some(&"c"));
     assert_eq!(cache.get(&3), Some(&"d"));
+}
+```
+
+### Async LRU Cache
+
+on your main.rs
+
+```rust
+use aba_cache as cache;
+
+#[tokio::main]
+async fn main() {
+    // create Cache, with multiple_cap set to 2
+    // and entry will be timeout after 10 seconds
+    let cache = cache::LruAsyncCache::<usize, &str>::new(2, 10);
+
+    cache.put(1, "a").await;
+    cache.put(2, "b").await;
+    cache.put(2, "c").await;
+    cache.put(3, "d").await;
+
+    assert_eq!(cache.get(&1).await, Some("a"));
+    assert_eq!(cache.get(&2).await, Some("c"));
+    assert_eq!(cache.get(&3).await, Some("d"));
 }
 ```
 

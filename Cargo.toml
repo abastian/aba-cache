@@ -9,4 +9,4 @@ slab = "0.4"
 tokio = { version = "0.2", features = ["sync", "parking_lot"] }
 
 [dev-dependencies]
-tokio = { version = "0.2", features = ["macros"] }
+tokio = { version = "0.2", features = ["macros", "rt-core", "time"] }
