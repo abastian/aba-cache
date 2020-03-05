@@ -1,9 +1,9 @@
 use std::{borrow::Borrow, collections::HashMap, hash::Hash, rc::Rc};
 
+use storage::{Pointer, Storage};
+
 pub(crate) mod asynchronous;
 mod storage;
-
-use storage::{Pointer, Storage};
 
 #[cfg(test)]
 mod tests;
@@ -47,7 +47,7 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     /// assert_eq!(cache.get(&2), Some(&"c"));
     /// assert_eq!(cache.get(&3), Some(&"d"));
     /// ```
-    pub fn get<'a, Q: ?Sized>(&'a mut self, key: &Q) -> Option<&'a V>
+    pub fn get<Q: ?Sized>(&mut self, key: &Q) -> Option<&V>
     where
         Rc<K>: Borrow<Q>,
         Q: Hash + Eq,
@@ -97,6 +97,39 @@ impl<K: Hash + Eq, V> Cache<K, V> {
             };
             self.map.insert(key, idx);
             result
+        }
+    }
+
+    /// Removes expired entry.
+    /// This operation will deallocate empty slab caused by entry removal if any.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aba_cache as cache;
+    /// use cache::LruCache;
+    /// use std::{thread, time::Duration};
+    ///
+    /// let mut cache = LruCache::new(2, 1);
+    ///
+    /// cache.put(String::from("1"), "one");
+    /// cache.put(String::from("2"), "two");
+    /// cache.put(String::from("3"), "three");
+    ///
+    /// assert_eq!(cache.len(), 3);
+    /// assert_eq!(cache.capacity(), 4);
+    ///
+    /// thread::sleep(Duration::from_secs(1));
+    /// cache.evict();
+    ///
+    /// assert_eq!(cache.len(), 0);
+    /// assert_eq!(cache.capacity(), 0);
+    /// ```
+    pub fn evict(&mut self) {
+        if !self.is_empty() {
+            self.storage.evict().drain(..).for_each(|key| {
+                self.map.remove(&key);
+            })
         }
     }
 

@@ -70,6 +70,40 @@ impl<K: Hash + Eq, V: Copy + Clone> Cache<K, V> {
         cache.put(key, value)
     }
 
+    /// Removes expired entry.
+    /// This operation will deallocate empty slab caused by entry removal if any.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aba_cache as cache;
+    /// use cache::LruAsyncCache;
+    /// use tokio::time::delay_for;
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let cache = LruAsyncCache::new(2, 1);
+    ///
+    ///     cache.put(String::from("1"), "one").await;
+    ///     cache.put(String::from("2"), "two").await;
+    ///     cache.put(String::from("3"), "three").await;
+    ///
+    ///     assert_eq!(cache.len().await, 3);
+    ///     assert_eq!(cache.capacity().await, 4);
+    ///
+    ///     delay_for(Duration::from_secs(1)).await;
+    ///     cache.evict().await;
+    ///
+    ///     assert_eq!(cache.len().await, 0);
+    ///     assert_eq!(cache.capacity().await, 0);
+    /// }
+    /// ```
+    pub async fn evict(&self) {
+        let mut cache = self.0.lock().await;
+        cache.evict();
+    }
+
     /// Returns the maximum number of key-value pairs the cache can hold.
     /// Note that on data insertion, when no space is available and no
     /// entry is timeout, then capacity will be added with `multiply_cap`

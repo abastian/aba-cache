@@ -195,6 +195,32 @@ impl<K, V> Storage<K, V> {
         }
     }
 
+    pub(super) fn evict(&mut self) -> Vec<K> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let mut result = Vec::new();
+        let (timeout_secs, mut tail) = (self.timeout_secs, self.tail);
+        while !tail.is_null() && self[tail].timestamp + timeout_secs <= now {
+            if let Pointer::InternalPointer { slab, pos } = tail {
+                let data = self.slabs[slab].remove(pos);
+                if self.slabs[slab].is_empty() {
+                    self.slabs.remove(slab);
+                }
+
+                result.push(data.key);
+                tail = data.prev;
+            }
+        }
+        if tail.is_null() {
+            self.head = Pointer::Null;
+        }
+        self.tail = tail;
+
+        result
+    }
+
     pub(super) fn capacity(&self) -> usize {
         self.slabs.iter().map(|(_, slab)| slab.capacity()).sum()
     }
@@ -257,7 +283,7 @@ impl<K, V> Storage<K, V> {
     }
 
     #[cfg(test)]
-    pub(super) fn iter<'a>(&'a self) -> Iter<'a, K, V> {
+    pub(super) fn iter(&self) -> Iter<K, V> {
         Iter {
             storage: self,
             current: self.head,
