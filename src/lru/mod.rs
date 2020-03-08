@@ -1,15 +1,27 @@
-use std::{collections::HashMap, hash::Hash, rc::Rc};
-
-mod storage;
+#[cfg(not(feature = "asynchronous"))]
+use std::rc::Rc;
+#[cfg(feature = "asynchronous")]
+use std::sync::Arc;
+use std::{borrow::Borrow, collections::HashMap, hash::Hash};
 
 use storage::{Pointer, Storage};
+
+#[cfg(feature = "asynchronous")]
+pub(crate) mod asynchronous;
+mod storage;
 
 #[cfg(test)]
 mod tests;
 
+#[cfg(not(feature = "asynchronous"))]
+type Ref<T> = Rc<T>;
+
+#[cfg(feature = "asynchronous")]
+type Ref<T> = Arc<T>;
+
 pub struct Cache<K, V> {
-    storage: Storage<Rc<K>, V>,
-    map: HashMap<Rc<K>, Pointer>,
+    storage: Storage<Ref<K>, V>,
+    map: HashMap<Ref<K>, Pointer>,
 }
 
 impl<K: Hash + Eq, V> Cache<K, V> {
@@ -46,7 +58,11 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     /// assert_eq!(cache.get(&2), Some(&"c"));
     /// assert_eq!(cache.get(&3), Some(&"d"));
     /// ```
-    pub fn get(&mut self, key: &K) -> Option<&V> {
+    pub fn get<Q: ?Sized>(&mut self, key: &Q) -> Option<&V>
+    where
+        Ref<K>: Borrow<Q>,
+        Q: Hash + Eq,
+    {
         if self.map.is_empty() {
             None
         } else if let Some(&index) = self.map.get(key) {
@@ -82,7 +98,7 @@ impl<K: Hash + Eq, V> Cache<K, V> {
         if let Some(&index) = self.map.get(&key) {
             Some(self.storage.update(index, value))
         } else {
-            let key = Rc::new(key);
+            let key = Ref::new(key);
             let (idx, old_pair) = self.storage.put(key.clone(), value);
             let result = if let Some((old_key, old_data)) = old_pair {
                 self.map.remove(&old_key);
@@ -92,6 +108,39 @@ impl<K: Hash + Eq, V> Cache<K, V> {
             };
             self.map.insert(key, idx);
             result
+        }
+    }
+
+    /// Removes expired entry.
+    /// This operation will deallocate empty slab caused by entry removal if any.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use aba_cache as cache;
+    /// use cache::LruCache;
+    /// use std::{thread, time::Duration};
+    ///
+    /// let mut cache = LruCache::new(2, 1);
+    ///
+    /// cache.put(String::from("1"), "one");
+    /// cache.put(String::from("2"), "two");
+    /// cache.put(String::from("3"), "three");
+    ///
+    /// assert_eq!(cache.len(), 3);
+    /// assert_eq!(cache.capacity(), 4);
+    ///
+    /// thread::sleep(Duration::from_secs(1));
+    /// cache.evict();
+    ///
+    /// assert_eq!(cache.len(), 0);
+    /// assert_eq!(cache.capacity(), 0);
+    /// ```
+    pub fn evict(&mut self) {
+        if !self.is_empty() {
+            self.storage.evict().drain(..).for_each(|key| {
+                self.map.remove(&key);
+            })
         }
     }
 
