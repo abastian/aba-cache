@@ -6,6 +6,8 @@ This implementation is based on "[LRU Cache](https://github.com/jeromefroe/lru-r
 
 ## Example
 
+### Basic LRU Cache
+
 Add following dependencies to Cargo.toml
 
 ```toml
@@ -13,8 +15,6 @@ Add following dependencies to Cargo.toml
 aba-cache = { git = "https://github.com/abastian/aba-cache", branch = "develop" }
 tokio = { version = "0.2", features = ["macros", "rt-core"] }
 ```
-
-### Basic LRU Cache
 
 on your main.rs
 
@@ -38,6 +38,14 @@ fn main() {
 ```
 
 ### Async LRU Cache
+
+Add following dependencies to Cargo.toml
+
+```toml
+[dependencies]
+aba-cache = { git = "https://github.com/abastian/aba-cache", branch = "develop", features = ["asynchronous"] }
+tokio = { version = "0.2", features = ["macros", "rt-core"] }
+```
 
 on your main.rs
 
