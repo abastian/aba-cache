@@ -1,6 +1,9 @@
 use super::*;
-use crate::{LruAsyncCache, LruCache};
+#[cfg(feature = "asynchronous")]
+use crate::LruAsyncCache;
+use crate::LruCache;
 use std::{thread, time::Duration};
+#[cfg(feature = "asynchronous")]
 use tokio::time::delay_for;
 
 #[test]
@@ -240,6 +243,7 @@ fn test_get_expire_entry() {
     assert_eq!(cache.capacity(), 4);
 }
 
+#[cfg(feature = "asynchronous")]
 #[tokio::test]
 async fn test_get_expire_entry_async() {
     let cache = LruAsyncCache::<usize, &str>::new(2, 1);
@@ -251,8 +255,7 @@ async fn test_get_expire_entry_async() {
     let cache_head = cache.get(&2).await;
     assert_eq!(cache_head, Some("two"));
 
-    delay_for(Duration::from_secs(1)).await;
-    assert_eq!(cache.get(&2).await, None);
-    assert_eq!(cache.len().await, 2);
-    assert_eq!(cache.capacity().await, 4);
+    delay_for(Duration::from_millis(1500)).await;
+    assert_eq!(cache.len().await, 0);
+    assert_eq!(cache.capacity().await, 0);
 }

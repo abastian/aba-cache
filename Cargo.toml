@@ -4,9 +4,13 @@ version = "0.1.0-SNAPSHOT"
 authors = ["Arief Bastian HB <ariefbastian@gmail.com>"]
 edition = "2018"
 
+[features]
+default = []
+asynchronous = ["tokio"]
+
 [dependencies]
 slab = "0.4"
-tokio = { version = "0.2", features = ["sync", "parking_lot"] }
+tokio = { version = "0.2", features = ["sync", "time", "parking_lot"], optional = true }
 
 [dev-dependencies]
-tokio = { version = "0.2", features = ["macros", "rt-core", "time"] }
+tokio = { version = "0.2", features = ["macros", "rt-core"] }

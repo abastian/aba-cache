@@ -1,15 +1,28 @@
 use super::Cache as InnerCache;
-use std::{borrow::Borrow, hash::Hash, rc::Rc};
-use tokio::sync::Mutex;
+use std::{borrow::Borrow, hash::Hash, sync::Arc, time::Duration};
+use tokio::{sync::Mutex, task, time};
 
 pub struct Cache<K, V>(Mutex<InnerCache<K, V>>);
 
-impl<K: Hash + Eq, V: Copy + Clone> Cache<K, V> {
+#[allow(clippy::needless_doctest_main)]
+impl<K: 'static + Hash + Eq + Sync + Send, V: 'static + Copy + Clone + Send> Cache<K, V> {
     /// Create new Cache, which will expiring its entry after `timeout_secs`
     /// and allocating new slab with capacity `multiply_cap` when no space
-    /// is ready and no entry expires.
-    pub fn new(multiply_cap: usize, timeout_secs: u64) -> Self {
-        Cache(Mutex::new(InnerCache::new(multiply_cap, timeout_secs)))
+    /// is ready and no entry expires
+    pub fn new(multiply_cap: usize, timeout_secs: u64) -> Arc<Self> {
+        let cache = Arc::new(Cache(Mutex::new(InnerCache::new(
+            multiply_cap,
+            timeout_secs,
+        ))));
+        let cache_async = cache.clone();
+        task::spawn(async move {
+            let duration = Duration::from_secs(timeout_secs);
+            loop {
+                time::delay_for(duration).await;
+                cache_async.evict().await
+            }
+        });
+        cache
     }
 
     /// Returns the value of the key in the cache or `None` if it is not
@@ -37,7 +50,7 @@ impl<K: Hash + Eq, V: Copy + Clone> Cache<K, V> {
     /// ```
     pub async fn get<Q: ?Sized>(&self, key: &Q) -> Option<V>
     where
-        Rc<K>: Borrow<Q>,
+        Arc<K>: Borrow<Q>,
         Q: Hash + Eq,
     {
         let mut cache = self.0.lock().await;
@@ -72,34 +85,7 @@ impl<K: Hash + Eq, V: Copy + Clone> Cache<K, V> {
 
     /// Removes expired entry.
     /// This operation will deallocate empty slab caused by entry removal if any.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use aba_cache as cache;
-    /// use cache::LruAsyncCache;
-    /// use tokio::time::delay_for;
-    /// use std::time::Duration;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let cache = LruAsyncCache::new(2, 1);
-    ///
-    ///     cache.put(String::from("1"), "one").await;
-    ///     cache.put(String::from("2"), "two").await;
-    ///     cache.put(String::from("3"), "three").await;
-    ///
-    ///     assert_eq!(cache.len().await, 3);
-    ///     assert_eq!(cache.capacity().await, 4);
-    ///
-    ///     delay_for(Duration::from_secs(1)).await;
-    ///     cache.evict().await;
-    ///
-    ///     assert_eq!(cache.len().await, 0);
-    ///     assert_eq!(cache.capacity().await, 0);
-    /// }
-    /// ```
-    pub async fn evict(&self) {
+    async fn evict(&self) {
         let mut cache = self.0.lock().await;
         cache.evict();
     }

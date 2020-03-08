@@ -1,16 +1,27 @@
-use std::{borrow::Borrow, collections::HashMap, hash::Hash, rc::Rc};
+#[cfg(not(feature = "asynchronous"))]
+use std::rc::Rc;
+#[cfg(feature = "asynchronous")]
+use std::sync::Arc;
+use std::{borrow::Borrow, collections::HashMap, hash::Hash};
 
 use storage::{Pointer, Storage};
 
+#[cfg(feature = "asynchronous")]
 pub(crate) mod asynchronous;
 mod storage;
 
 #[cfg(test)]
 mod tests;
 
+#[cfg(not(feature = "asynchronous"))]
+type Ref<T> = Rc<T>;
+
+#[cfg(feature = "asynchronous")]
+type Ref<T> = Arc<T>;
+
 pub struct Cache<K, V> {
-    storage: Storage<Rc<K>, V>,
-    map: HashMap<Rc<K>, Pointer>,
+    storage: Storage<Ref<K>, V>,
+    map: HashMap<Ref<K>, Pointer>,
 }
 
 impl<K: Hash + Eq, V> Cache<K, V> {
@@ -49,7 +60,7 @@ impl<K: Hash + Eq, V> Cache<K, V> {
     /// ```
     pub fn get<Q: ?Sized>(&mut self, key: &Q) -> Option<&V>
     where
-        Rc<K>: Borrow<Q>,
+        Ref<K>: Borrow<Q>,
         Q: Hash + Eq,
     {
         if self.map.is_empty() {
@@ -87,7 +98,7 @@ impl<K: Hash + Eq, V> Cache<K, V> {
         if let Some(&index) = self.map.get(&key) {
             Some(self.storage.update(index, value))
         } else {
-            let key = Rc::new(key);
+            let key = Ref::new(key);
             let (idx, old_pair) = self.storage.put(key.clone(), value);
             let result = if let Some((old_key, old_data)) = old_pair {
                 self.map.remove(&old_key);
