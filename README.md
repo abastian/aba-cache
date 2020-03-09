@@ -12,8 +12,7 @@ Add following dependencies to Cargo.toml
 
 ```toml
 [dependencies]
-aba-cache = { git = "https://github.com/abastian/aba-cache", branch = "develop" }
-tokio = { version = "0.2", features = ["macros", "rt-core"] }
+aba-cache = { version = "0.1.0-SNAPSHOT", default-features = false }
 ```
 
 on your main.rs
@@ -43,7 +42,7 @@ Add following dependencies to Cargo.toml
 
 ```toml
 [dependencies]
-aba-cache = { git = "https://github.com/abastian/aba-cache", branch = "develop", features = ["asynchronous"] }
+aba-cache = { version = "0.1.0-SNAPSHOT" }
 tokio = { version = "0.2", features = ["macros", "rt-core"] }
 ```
 
