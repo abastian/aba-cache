@@ -12,7 +12,7 @@ Add following dependencies to Cargo.toml
 
 ```toml
 [dependencies]
-aba-cache = { version = "0.1.0", default-features = false }
+aba-cache = { version = "0.2.0-SNAPSHOT", default-features = false }
 ```
 
 on your main.rs
@@ -42,7 +42,7 @@ Add following dependencies to Cargo.toml
 
 ```toml
 [dependencies]
-aba-cache = { version = "0.1.0" }
+aba-cache = { version = "0.2.0-SNAPSHOT" }
 tokio = { version = "0.2", features = ["macros", "rt-core"] }
 ```
 

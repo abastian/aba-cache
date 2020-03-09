@@ -1,6 +1,6 @@
 [package]
 name = "aba-cache"
-version = "0.1.0"
+version = "0.2.0-SNAPSHOT"
 authors = ["Arief Bastian HB <ariefbastian@gmail.com>"]
 edition = "2018"
 description = "Embedded in-memory cache library"
