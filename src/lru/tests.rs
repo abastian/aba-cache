@@ -2,7 +2,10 @@ use super::*;
 #[cfg(feature = "asynchronous")]
 use crate::LruAsyncCache;
 use crate::LruCache;
-use std::{thread, time::Duration};
+use serde_json::{self, Value};
+#[cfg(feature = "asynchronous")]
+use std::sync::Arc;
+use std::{rc::Rc, thread, time::Duration};
 #[cfg(feature = "asynchronous")]
 use tokio::time::delay_for;
 
@@ -40,13 +43,20 @@ fn test_get_uncached_key() {
 
 #[test]
 fn test_reuse_single_entry() {
-    let mut cache = LruCache::<usize, usize>::new(1, 60);
+    let mut cache = LruCache::<&str, Rc<Value>>::new(1, 60);
 
-    let old_value = cache.put(1, 1);
+    let val_1: Rc<Value> = Rc::new(serde_json::from_str(r#"{"id":1}"#).unwrap());
+    let val_2: Rc<Value> = Rc::new(serde_json::from_str(r#"{"id":2}"#).unwrap());
+
+    let old_value = cache.put("1", val_1.clone());
     assert_eq!(old_value, None);
 
-    let old_value = cache.put(1, 2);
-    assert_eq!(old_value, Some(1));
+    let old_value = cache.put("1", val_2.clone());
+    assert!(if let Some(value) = old_value {
+        value == val_1
+    } else {
+        false
+    });
     assert_eq!(cache.len(), 1);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
@@ -61,14 +71,21 @@ fn test_reuse_single_entry() {
 
 #[test]
 fn test_reuse_expire_entry() {
-    let mut cache = LruCache::<usize, usize>::new(2, 1);
+    let mut cache = LruCache::<usize, Rc<Value>>::new(2, 1);
 
-    let old_value = cache.put(1, 1);
+    let val_1: Rc<Value> = Rc::new(serde_json::from_str(r#"{"id":1}"#).unwrap());
+    let val_2: Rc<Value> = Rc::new(serde_json::from_str(r#"{"id":2}"#).unwrap());
+
+    let old_value = cache.put(1, val_1.clone());
     assert_eq!(old_value, None);
 
     thread::sleep(Duration::from_secs(1));
-    let old_value = cache.put(2, 2);
-    assert_eq!(old_value, Some(1));
+    let old_value = cache.put(2, val_2.clone());
+    assert!(if let Some(value) = old_value {
+        value == val_1
+    } else {
+        false
+    });
     assert_eq!(cache.len(), 1);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
@@ -83,17 +100,25 @@ fn test_reuse_expire_entry() {
 
 #[test]
 fn test_reuse_last_expire_entry() {
-    let mut cache = LruCache::<usize, usize>::new(2, 1);
+    let mut cache = LruCache::<usize, Rc<Value>>::new(2, 1);
 
-    let old_value = cache.put(1, 1);
+    let val_1: Rc<Value> = Rc::new(serde_json::from_str(r#"{"id":1}"#).unwrap());
+    let val_2: Rc<Value> = Rc::new(serde_json::from_str(r#"{"id":2}"#).unwrap());
+    let val_3: Rc<Value> = Rc::new(serde_json::from_str(r#"{"id":3}"#).unwrap());
+
+    let old_value = cache.put(1, val_1.clone());
     assert_eq!(old_value, None);
 
-    let old_value = cache.put(2, 2);
+    let old_value = cache.put(2, val_2.clone());
     assert_eq!(old_value, None);
 
     thread::sleep(Duration::from_secs(1));
-    let old_value = cache.put(3, 3);
-    assert_eq!(old_value, Some(1));
+    let old_value = cache.put(3, val_3.clone());
+    assert!(if let Some(value) = old_value {
+        value == val_1
+    } else {
+        false
+    });
     assert_eq!(cache.len(), 2);
     let mut iter = cache.storage.iter();
     assert!(if let Some(item) = iter.next() {
@@ -246,14 +271,21 @@ fn test_get_expire_entry() {
 #[cfg(feature = "asynchronous")]
 #[tokio::test]
 async fn test_get_expire_entry_async() {
-    let cache = LruAsyncCache::<usize, &str>::new(2, 1);
+    let cache = LruAsyncCache::<usize, Arc<Value>>::new(2, 1);
 
-    cache.put(1, "one").await;
-    cache.put(2, "two").await;
-    cache.put(3, "three").await;
+    let val_1: Arc<Value> = Arc::new(serde_json::from_str(r#"{"id":1}"#).unwrap());
+    let val_2: Arc<Value> = Arc::new(serde_json::from_str(r#"{"id":2}"#).unwrap());
+    let val_3: Arc<Value> = Arc::new(serde_json::from_str(r#"{"id":3}"#).unwrap());
 
-    let cache_head = cache.get(&2).await;
-    assert_eq!(cache_head, Some("two"));
+    cache.put(1, val_1.clone()).await;
+    cache.put(2, val_2.clone()).await;
+    cache.put(3, val_3.clone()).await;
+
+    assert!(if let Some(value) = cache.get(&2).await {
+        value == val_2
+    } else {
+        false
+    });
 
     delay_for(Duration::from_millis(1500)).await;
     assert_eq!(cache.len().await, 0);
