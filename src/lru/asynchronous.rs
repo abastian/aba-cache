@@ -2,10 +2,11 @@ use super::Cache as InnerCache;
 use std::{borrow::Borrow, hash::Hash, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task, time};
 
+/// Async version of Cache with LRU eviction strategy
 pub struct Cache<K, V>(Mutex<InnerCache<K, V>>);
 
 #[allow(clippy::needless_doctest_main)]
-impl<K: 'static + Hash + Eq + Sync + Send, V: 'static + Copy + Clone + Send> Cache<K, V> {
+impl<K: 'static + Hash + Eq + Sync + Send, V: 'static + Clone + Send> Cache<K, V> {
     /// Create new Cache, which will expiring its entry after `timeout_secs`
     /// and allocating new slab with capacity `multiply_cap` when no space
     /// is ready and no entry expires
@@ -25,7 +26,7 @@ impl<K: 'static + Hash + Eq + Sync + Send, V: 'static + Copy + Clone + Send> Cac
         cache
     }
 
-    /// Returns the value of the key in the cache or `None` if it is not
+    /// Returns the clone value of the key in the cache or `None` if it is not
     /// present in the cache. Moves the key to the head of the LRU list if it exists.
     ///
     /// # Example
