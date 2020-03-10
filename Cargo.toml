@@ -1,14 +1,14 @@
 [package]
 name = "aba-cache"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Arief Bastian HB <ariefbastian@gmail.com>"]
 edition = "2018"
-description = "Embedded in-memory cache library"
+description = "In-process in-memory cache library"
 homepage = "https://github.com/abastian/aba-cache"
 repository = "https://github.com/abastian/aba-cache.git"
 readme = "README.md"
 license = "MIT"
-keywords = ["cache", "in-memory", "embedded"]
+keywords = ["cache", "in-memory", "in-process", "async"]
 
 [features]
 default = ["asynchronous"]
@@ -20,3 +20,7 @@ tokio = { version = "0.2", features = ["sync", "time"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["macros", "rt-core"] }
+serde_json = { version = "1.0" }
+
+[package.metadata."docs.rs"]
+all-features = true
