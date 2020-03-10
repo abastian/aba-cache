@@ -55,6 +55,8 @@ use aba_cache as cache;
 async fn main() {
     // create Cache, with multiple_cap set to 2
     // and entry will be timeout after 10 seconds
+    // additionally, this setup runtime daemon to evict outdate entry
+    // every 10 seconds
     let cache = cache::LruAsyncCache::<usize, &str>::new(2, 10);
 
     cache.put(1, "a").await;
@@ -66,22 +68,6 @@ async fn main() {
     assert_eq!(cache.get(&2).await, Some("c"));
     assert_eq!(cache.get(&3).await, Some("d"));
 }
-```
-
-**NB:** If you have difficulty when running cargo build with error something like "[failed to authenticate when downloading repository](https://github.com/rust-lang/cargo/issues/3381)", do following:
-
-- add these lines to ~/.gitconfig
-
-```text
-[url "git@github.com:"]
-    insteadOf = https://github.com/
-```
-
-- add these lines to ~/.cargo/config
-
-```text
-[net]
-git-fetch-with-cli = true
 ```
 
 ## References

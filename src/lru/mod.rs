@@ -19,6 +19,7 @@ type Ref<T> = Rc<T>;
 #[cfg(feature = "asynchronous")]
 type Ref<T> = Arc<T>;
 
+/// Cache with LRU eviction strategy
 pub struct Cache<K, V> {
     storage: Storage<Ref<K>, V>,
     map: HashMap<Ref<K>, Pointer>,
