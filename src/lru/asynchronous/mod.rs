@@ -1,6 +1,12 @@
-use super::Cache as InnerCache;
+use super::basic::Cache as InnerCache;
 use std::{borrow::Borrow, hash::Hash, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task, time};
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "update-intent")]
+pub(crate) mod update_intent;
 
 /// Async version of Cache with LRU eviction strategy
 pub struct Cache<K, V>(Mutex<InnerCache<K, V>>);

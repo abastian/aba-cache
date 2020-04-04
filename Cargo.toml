@@ -1,6 +1,6 @@
 [package]
 name = "aba-cache"
-version = "0.2.0-SNAPSHOT"
+version = "0.1.2-SNAPSHOT"
 authors = ["Arief Bastian HB <ariefbastian@gmail.com>"]
 edition = "2018"
 description = "In-process in-memory cache library"
@@ -11,16 +11,18 @@ license = "MIT"
 keywords = ["cache", "in-memory", "in-process", "async"]
 
 [features]
-default = ["asynchronous"]
+default = ["update-intent"]
 asynchronous = ["tokio"]
+update-intent = ["asynchronous", "parking_lot"]
 
 [dependencies]
 slab = "0.4"
-tokio = { version = "0.2", features = ["sync", "time"], optional = true }
+tokio = { version = "0.2", features = ["sync", "time", "parking_lot"], optional = true }
+parking_lot = { version = "0.10", optional = true }
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["macros", "rt-core"] }
 serde_json = { version = "1.0" }
 
-[package.metadata."docs.rs"]
+[package.metadata.docs.rs]
 all-features = true

@@ -10,7 +10,7 @@
 //!
 //! ## Caveat
 //!
-//! If you need to use non-asynchronous, just disable default feature for this crate on your `Cargo.toml`
+//! If you need to use asynchronous, enable feature "asynchronous" for this crate on your `Cargo.toml`
 //!
 //! If you do need to use reference for your value, on non-asynchronous do use `std::rc::Rc`,
 //! and on asynchronous do use `std::sync::Arc`
@@ -27,7 +27,7 @@
 //!
 //! ### main.rs
 //!
-//! ```rust,no_run
+//! ```
 //! use aba_cache as cache;
 //! use cache::LruCache;
 //! use serde_json::{self, Value};
@@ -58,14 +58,14 @@
 //! ### Cargo.toml
 //!
 //! ```toml
-//! aba-cache = { version = "0.1", default-features = false }
+//! aba-cache = { version = "0.1", default-features = false, features = ["asynchronous"] }
 //! serde_json = { version = "1.0" }
 //! tokio = { version = "0.2", features = ["macros", "rt-core"] }
 //! ```
 //!
 //! ### main.rs
 //!
-//! ```rust,no_run
+//! ```
 //! use aba_cache as cache;
 //! use cache::LruAsyncCache;
 //! use serde_json::{self, Value};
@@ -83,13 +83,11 @@
 //!     cache.put("one", val_one.clone()).await;
 //!     cache.put("two", val_two.clone()).await;
 //!
-//!     assert!(
-//!         if let Some(value) = cache.get(&"one").await {
-//!             value == val_one
-//!         } else {
-//!             false
-//!         }
-//!     );
+//!     assert!(if let Some(value) = cache.get(&"one").await {
+//!         value == val_one
+//!     } else {
+//!         false
+//!     });
 //!     assert_eq!(cache.get(&"three").await, None);
 //!
 //!     Ok(())
@@ -97,6 +95,8 @@
 //! ```
 mod lru;
 
+#[cfg(feature = "update-intent")]
+pub use lru::asynchronous::update_intent::Cache as LruAsyncUpdateIntentCache;
 #[cfg(feature = "asynchronous")]
 pub use lru::asynchronous::Cache as LruAsyncCache;
-pub use lru::Cache as LruCache;
+pub use lru::basic::Cache as LruCache;
